@@ -1,20 +1,24 @@
 package com.view.baseadapterexample
 
 import android.view.LayoutInflater
-import android.view.View
 import android.view.ViewGroup
 import androidx.annotation.LayoutRes
+import androidx.databinding.DataBindingUtil
+import androidx.databinding.ViewDataBinding
 import androidx.recyclerview.widget.RecyclerView
+import com.view.baseadapterexample.databinding.ItemViewHolder1Binding
 
 class BaseAdapter(
-    private var listViewHolder: List<ViewHolderMapper<RecyclerView.ViewHolder>> = listOf(),
+    private var listViewHolder: ArrayList<ViewHolderMapper<out RecyclerView.ViewHolder>>,
+    private val viewHolderFactories: Map<Int, ViewHolderFactory<out ViewDataBinding>>,
     private val onBindViewHolders: (RecyclerView.ViewHolder, Int) -> Unit
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
-
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
-        val view = LayoutInflater.from(parent.context).inflate(viewType, parent, false)
-        val viewHolderMapper = listViewHolder.find { it.layoutId == viewType }
-        return createViewHolder(view, viewHolderMapper?.viewholderClass?.canonicalName.toString())
+        val inflater = LayoutInflater.from(parent.context)
+
+        val binding: ViewDataBinding = DataBindingUtil.inflate(inflater, viewType, parent, false)
+        val viewHolderItem = listViewHolder.find { it.layoutId == viewType }!!
+        return createViewHolder(binding, viewHolderItem.layoutId)
     }
 
     override fun getItemCount(): Int {
@@ -29,31 +33,19 @@ class BaseAdapter(
         return listViewHolder[position].layoutId
     }
 
-    private fun createViewHolder(view: View, viewHolderClassName: String): RecyclerView.ViewHolder {
-        return try {
-            val viewHolderClass = Class.forName(viewHolderClassName).asSubclass(RecyclerView.ViewHolder::class.java)
-            val constructor = viewHolderClass.getConstructor(View::class.java)
-
-            constructor.newInstance(view) as RecyclerView.ViewHolder
-        } catch (e: Exception) {
-            throw IllegalArgumentException("Could not create ViewHolder: $viewHolderClassName", e)
-        }
+    @Suppress("UNCHECKED_CAST")
+    private fun createViewHolder(binding: ViewDataBinding, layoutId: Int): RecyclerView.ViewHolder {
+        val factory = viewHolderFactories[layoutId]
+        return (factory as ViewHolderFactory<ViewDataBinding>).create(binding)
     }
 }
 
-data class ViewHolderMapper<out VH: RecyclerView.ViewHolder>(
+interface ViewHolderFactory<VB : ViewDataBinding> {
+    fun create(binding: VB): RecyclerView.ViewHolder
+}
+
+
+data class ViewHolderMapper<VH : RecyclerView.ViewHolder>(
     @LayoutRes var layoutId: Int,
-    var viewholderClass: Class<out @UnsafeVariance VH>
+    val viewholderClass: Class<VH>
 )
-
-class ViewHolder1(var view: View): RecyclerView.ViewHolder(view) {
-    fun bindFirst() {
-
-    }
-}
-
-class ViewHolder2(var view: View): RecyclerView.ViewHolder(view) {
-    fun bindSeconde() {
-
-    }
-}
